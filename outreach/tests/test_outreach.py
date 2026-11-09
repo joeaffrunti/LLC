@@ -14,7 +14,8 @@ def make_cfg(tmp: Path, **overrides):
     env = {
         "OUTREACH_DB": str(tmp / "t.db"),
         "OUTREACH_OUTBOX": str(tmp / "outbox"),
-        "OUTREACH_FROM_EMAIL": "joe@feelingswellmedia.test",
+        "OUTREACH_FROM_EMAIL": "joe@example.test",
+        "OUTREACH_COMPANY_NAME": "Acme Web",
         "OUTREACH_SENDER_NAME": "Joe",
         "OUTREACH_POSTAL_ADDRESS": "1 Main St, Springfield",
         "SMTP_HOST": "smtp.test", "SMTP_USER": "u", "SMTP_PASSWORD": "p",
@@ -107,7 +108,8 @@ class TemplateTests(unittest.TestCase):
 
     def test_pitch_includes_address_and_opt_out(self):
         body = templates.render(templates.PITCH_BODY, business_name="X", city="Y", category="diner",
-                                sender_name="Joe", postal_address="1 Main St", from_email="j@x.test")
+                                company_name="Acme Web", sender_name="Joe", postal_address="1 Main St",
+                                from_email="j@x.test")
         self.assertIn("1 Main St", body)
         self.assertIn("unsubscribe", body.lower())
 

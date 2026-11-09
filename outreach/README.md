@@ -1,6 +1,6 @@
 # Outreach agent
 
-Sends a short pitch to local businesses that **don't have a website**, asking whether they'd like one, then reads and sorts their replies.
+Sends a short pitch (for your company) to local businesses that **don't have a website**, asking whether they'd like one, then reads and sorts their replies.
 
 It is deliberately conservative:
 
@@ -18,7 +18,8 @@ Set these environment variables in your shell. Don't commit them.
 
 | Variable | Purpose |
 | --- | --- |
-| `OUTREACH_FROM_EMAIL` | Address pitches come from, e.g. your Feeling Swell Media address |
+| `OUTREACH_FROM_EMAIL` | Address pitches come from, e.g. you@yourdomain.com |
+| `OUTREACH_COMPANY_NAME` | Your business name, shown in the pitch |
 | `OUTREACH_SENDER_NAME` | Your name for the signature |
 | `OUTREACH_POSTAL_ADDRESS` | Physical mailing address. Required by CAN-SPAM for commercial email; live sending refuses to run without it. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | Outbound mail server |

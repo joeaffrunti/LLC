@@ -53,6 +53,8 @@ def _require_live_config(cfg: Config) -> None:
     missing = cfg.missing_for_live_send()
     if missing:
         sys.exit(f"Live sending needs these environment variables: {', '.join(missing)}")
+    if not cfg.company_name:
+        sys.exit("Live sending needs OUTREACH_COMPANY_NAME")
     if "@" not in cfg.from_email:
         sys.exit("OUTREACH_FROM_EMAIL must be an email address")
 
@@ -62,6 +64,7 @@ def _fields(cfg: Config, lead) -> dict[str, str]:
         "business_name": lead["business_name"],
         "city": lead["city"] or "your area",
         "category": lead["category"] or "business",
+        "company_name": cfg.company_name or "[Your Company]",
         "sender_name": cfg.sender_name or "[Your Name]",
         "postal_address": cfg.postal_address or "[Your Postal Address]",
         "from_email": cfg.from_email or "[from address]",
