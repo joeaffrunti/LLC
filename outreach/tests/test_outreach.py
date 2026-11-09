@@ -198,3 +198,89 @@ class InboxTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FakeIMAP:
+    """Stands in for imaplib.IMAP4_SSL, returning the same response shapes a real server does."""
+
+    def __init__(self, messages):
+        self.messages = messages  # list of raw RFC822 bytes
+        self.logged_out = False
+
+    def login(self, user, password):
+        return ("OK", [b"logged in"])
+
+    def select(self, mailbox):
+        return ("OK", [b"1"])
+
+    def search(self, charset, criteria):
+        assert criteria == "UNSEEN"
+        nums = " ".join(str(i + 1) for i in range(len(self.messages))).encode()
+        return ("OK", [nums])
+
+    def fetch(self, num, parts):
+        raw = self.messages[int(num) - 1]
+        return ("OK", [(b"%s (RFC822 {%d}" % (num, len(raw)), raw), b")"])
+
+    def logout(self):
+        self.logged_out = True
+        return ("BYE", [b""])
+
+
+def _raw(from_addr, subject, body, msg_id, in_reply_to=None):
+    m = EmailMessage()
+    m["From"] = from_addr
+    m["To"] = "joe@example.test"
+    m["Subject"] = subject
+    m["Message-ID"] = msg_id
+    m["Date"] = "Mon, 09 Nov 2026 19:00:00 +0000"
+    if in_reply_to:
+        m["In-Reply-To"] = in_reply_to
+        m["References"] = in_reply_to
+    m.set_content(body)
+    return bytes(m)
+
+
+class PollEndToEndTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cfg = make_cfg(Path(self.tmp.name))
+        self.conn = db.connect(self.cfg.db_path)
+        self.addCleanup(self.conn.close)
+        self.lead_id = db.add_lead(self.conn, "Good Diner", "owner@diner.test", "restaurant", "Springfield")
+        db.mark_contacted(self.conn, self.lead_id, "pitched")
+        db.record_message(self.conn, self.lead_id, "out", "pitch", "A website", "b",
+                          "<pitch1@feelingswellmedia.test>")
+
+    def _poll(self, messages):
+        fake = FakeIMAP(messages)
+        with mock.patch.object(inbox.imaplib, "IMAP4_SSL", return_value=fake):
+            events = inbox.poll(self.cfg, self.conn)
+        self.assertTrue(fake.logged_out)
+        return events
+
+    def test_real_shaped_imap_session(self):
+        messages = [
+            _raw("Owner <owner@diner.test>", "Re: A website for Good Diner?",
+                 "Yes, send me pricing please.\n\nOn Mon, Joe wrote:\n> A website...",
+                 "<r1@diner.test>", in_reply_to="<pitch1@feelingswellmedia.test>"),
+            _raw("stranger@elsewhere.test", "Hello", "Who are you?", "<x1@elsewhere.test>"),
+        ]
+        events = self._poll(messages)
+        self.assertEqual([e.intent for e in events], ["interested"])
+        self.assertEqual(db.get_lead(self.conn, self.lead_id)["status"], "interested")
+
+    def test_rerun_does_not_duplicate_replies(self):
+        messages = [_raw("owner@diner.test", "Re", "Not interested, thanks.", "<r2@diner.test>")]
+        self._poll(messages)
+        self._poll(messages)
+        replies = [m for m in db.messages_for_lead(self.conn, self.lead_id) if m["direction"] == "in"]
+        self.assertEqual(len(replies), 1)
+
+    def test_bounce_via_imap(self):
+        dsn = _raw("Mail Delivery <MAILER-DAEMON@mx.test>", "Undeliverable",
+                   "Your message to owner@diner.test could not be delivered.", "<dsn9@mx.test>")
+        events = self._poll([dsn])
+        self.assertEqual([e.kind for e in events], ["bounce"])
+        self.assertTrue(db.is_suppressed(self.conn, "owner@diner.test"))

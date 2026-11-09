@@ -144,6 +144,10 @@ def find_lead_for_message_id(conn, message_id: str):
     return get_lead(conn, row["lead_id"]) if row else None
 
 
+def message_seen(conn, message_id: str) -> bool:
+    return conn.execute("SELECT 1 FROM messages WHERE message_id = ?", (message_id,)).fetchone() is not None
+
+
 def messages_for_lead(conn, lead_id: int):
     return conn.execute("SELECT * FROM messages WHERE lead_id = ? ORDER BY created", (lead_id,)).fetchall()
 

@@ -49,6 +49,10 @@ def handle_message(conn, raw: Message) -> Event | None:
     sender = parseaddr(raw.get("From", ""))[1].lower()
     body = _body_text(raw)
 
+    # Skip messages we have already processed (IMAP may re-deliver them).
+    if raw.get("Message-ID") and db.message_seen(conn, raw["Message-ID"]):
+        return None
+
     # 1) Bounces: find the original recipient address inside the DSN body.
     if _BOUNCE_SENDERS.search(sender):
         for candidate in _EMAIL_RE.findall(body):
