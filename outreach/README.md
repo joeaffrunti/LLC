@@ -51,6 +51,24 @@ python -m outreach status
 
 Run `poll` on a schedule (cron, or a scheduled task) so replies are handled while you're away.
 
+Example crontab (edit the path and make sure the environment variables are available to cron, for example by sourcing a file that exports them):
+
+```cron
+# Read replies every 30 minutes
+*/30 * * * * cd /path/to/LLC && python3 -m outreach poll >> /path/to/outreach.log 2>&1
+
+# Follow up once a day at 9:00 on leads with no reply after OUTREACH_FOLLOWUP_DAYS
+0 9 * * * cd /path/to/LLC && python3 -m outreach followup --live >> /path/to/outreach.log 2>&1
+```
+
+Only add the follow-up line after you've reviewed a live pitch batch. It sends mail without a prompt.
+
+Before going live, check the sending domain's records:
+
+```bash
+python -m outreach check-domain yourdomain.com --selector <your-dkim-selector>
+```
+
 ## Lead statuses
 
 | Status | Meaning |
@@ -88,4 +106,5 @@ python -m unittest discover -s outreach/tests -t .
 - `mailer.py`: builds messages, sends via SMTP or writes drafts
 - `inbox.py`: reads IMAP, matches replies by threading headers and sender, handles bounces
 - `classify.py`: reply intent rules
+- `domain_check.py`: SPF, DKIM, and DMARC check for the sending domain
 - `leads.example.csv`: sample input

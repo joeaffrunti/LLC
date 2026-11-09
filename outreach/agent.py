@@ -6,6 +6,7 @@
     python -m outreach followup [--live]         # one follow-up to pitched leads with no reply
     python -m outreach poll [--live]             # read replies, classify, update statuses
     python -m outreach status                    # counts per status + items needing a human
+    python -m outreach check-domain example.com  # verify SPF, DKIM, DMARC before going live
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from pathlib import Path
 
 from . import db, templates, mailer, inbox
 from .config import Config, load_config
+from . import domain_check
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MIN_SECONDS_BETWEEN_SENDS = 20  # gentle pacing; cold mail should not be bursty
@@ -165,6 +167,10 @@ def main(argv: list[str] | None = None) -> None:
 
     sub.add_parser("status", help="show lead counts and items needing a human")
 
+    p = sub.add_parser("check-domain", help="check SPF, DKIM, and DMARC for a sending domain")
+    p.add_argument("domain")
+    p.add_argument("--selector", default="default", help="DKIM selector from your mail provider")
+
     args = parser.parse_args(argv)
     cfg = load_config()
     conn = db.connect(cfg.db_path)
@@ -179,6 +185,9 @@ def main(argv: list[str] | None = None) -> None:
         cmd_poll(cfg, conn, args.live)
     elif args.cmd == "status":
         cmd_status(conn)
+    elif args.cmd == "check-domain":
+        for name, result in domain_check.check_domain(args.domain, args.selector).items():
+            print(f"  {name:6} {result}")
 
 
 if __name__ == "__main__":
